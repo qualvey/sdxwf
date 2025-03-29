@@ -1,3 +1,4 @@
+
 import json
 import requests
 from openpyxl import load_workbook
@@ -15,6 +16,10 @@ work_time_xl = f"{env.proj_dir}/et/2025年3月工时表.xlsx"
 workbook = load_workbook(work_time_xl)
 worksheet = workbook.active
 
+#today = datetime.today()-timedelta(days=8)
+today = datetime.today()
+print(today.weekday())
+
 duration_sum = {}
 
 def get_previous_week_range(dt):
@@ -29,10 +34,14 @@ def get_previous_week_range(dt):
     week_dates = [last_monday + timedelta(days=i) for i in range(7)]
     return week_dates
 
+weekdays = get_previous_week_range(today)
+
 obj_mon = weekdays[0]
 obj_sun = weekdays[6]
 mon = str(obj_mon)
 sun = str(obj_sun)
+
+print('请求的日期范围:', mon,sun)
 
 scheme = 'https'
 netloc = 'hub.sdxnetcafe.com'
@@ -41,14 +50,12 @@ params =''
 fragment = ''
 
 def get_total_wduration(data_json):
-
     duration_sum = 0
     if data_json['data']['total'] == 7:
         data_list = data_json['data']['rows'] 
     else:
         print("not 7days") 
         data_list = data_json['data']['rows'] 
-
     for item in data_list:
         duration_sum += item['duration']
     return duration_sum
@@ -155,9 +162,9 @@ def to_xl(worksheet, json):
 wdrt_sum()
 
 members_json = get_json_person()
+
 with open(f'{env.proj_dir}/worktime/members_json.json', 'w') as cache:
     json.dump(members_json, cache, ensure_ascii=False, indent=4)
-
 
 for name, user_json in  members_json.items():
 

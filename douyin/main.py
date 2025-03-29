@@ -20,42 +20,11 @@ logger = logging.getLogger(__name__)
 # 将 requests 库的日志级别设置为 DEBUG
 #logging.getLogger('urllib3').setLevel(logging.DEBUG)
 
-if args.now:
-    now = datetime.datetime.now()
-    now = now - datetime.timedelta(days=1)
-    today_midnight = datetime.datetime(now.year, now.month, now.day)
-    today_end = today_midnight + datetime.timedelta(hours=23, minutes=59, seconds=59)
-
-    # 转换为 Unix 时间戳（单位：秒）
-    begin_timestamp = int(today_midnight.timestamp())
-    end_timestamp = int(today_end.timestamp())
-else:
-
-    begin_timestamp = env.begin_timestamp_dy
-    end_timestamp   = env.end_timestamp_dy
 
 
 
 cookie          = env.configjson['cookies']['dy']
-
 url = "https://life.douyin.com/life/trade_view/v1/verify/verify_record_list/?page_index=1&page_size=20&industry=industry_common&root_life_account_id=7136075595087087628"
-
-post_data = {
-    "filter":{
-        "start_time": begin_timestamp,
-        "end_time": end_timestamp,
-        "poi_id_list":[],
-        "sku_id_list":[],
-        "product_option":[],
-        "is_market":False,
-        "is_market_poi":False
-    },
-    "is_user_poi_filter":False,
-    "is_expend_to_poi":True,
-    "auth_poi_extra_filter":{},
-    "industry":"industry_common",
-    "permission_common_param":{}
-}
 
 def parse_cookie_string(cookie_string):
     cookie = SimpleCookie()
@@ -87,7 +56,32 @@ headers = {
     }
 cookies = parse_cookie_string(cookie)
 
-def get_douyin_data():
+def get_douyin_data(date):
+
+    today_start = datetime.datetime(date.year, date.month, date.day)
+    today_end = today_start + datetime.timedelta(hours=23, minutes=59, seconds=59)
+
+    print('抖音数据日期:', today_end)
+    # 转换为 Unix 时间戳（单位：秒）
+    begin_timestamp = int(today_start.timestamp())
+    end_timestamp = int(today_end.timestamp())
+
+    post_data = {
+        "filter":{
+            "start_time": begin_timestamp,
+            "end_time": end_timestamp,
+            "poi_id_list":[],
+            "sku_id_list":[],
+            "product_option":[],
+            "is_market":False,
+            "is_market_poi":False
+        },
+        "is_user_poi_filter":False,
+        "is_expend_to_poi":True,
+        "auth_poi_extra_filter":{},
+        "industry":"industry_common",
+        "permission_common_param":{}
+    }
     try:
         response = requests.post(url, json=post_data, headers=headers, cookies=cookies)
         response.raise_for_status()  # 如果响应状态码不是 200，抛出异常
@@ -99,23 +93,20 @@ def get_douyin_data():
     except requests.exceptions.RequestException as e:
         logger.error(f"请求发生错误: {e}")
 
-json_data = get_douyin_data()
-
-
-sum = 0
-try:
-    for item in json_data['data']['list']:
-        actual_amount = item['sku']['amount']['actual_amount']
-        sum+=actual_amount/100
-except:
-    pass
-
 if __name__ == "__main__":
     print(begin_timestamp)
     print(end_timestamp)
     print("总金额",sum)
 
-def get_douyinSum():
+def get_douyinSum(date):
+    sum = 0
+    json_data = get_douyin_data(date)
+    try:
+        for item in json_data['data']['list']:
+            actual_amount = item['sku']['amount']['actual_amount']
+            sum+=actual_amount/100
+    except:
+        pass
     if sum==0:
         return None
     return sum

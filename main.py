@@ -1,6 +1,8 @@
 import shutil
+import pdb
 import os
 import logging
+import argparse
 from datetime   import datetime, date, timedelta
 from copy       import copy
 
@@ -12,49 +14,51 @@ from openpyxl.cell.rich_text import CellRichText, TextBlock, TextBlock
 from meituan.main       import get_meituanSum, mt_status
 from douyin.main        import get_douyinSum
 from operation.main     import get_operation_data
-from operation.elecdata import get_elecUsage, get_row_by_date
+from operation import elecdata as electron
 from specialFee      import main as specialFee
 from tools              import env
+
+parser = argparse.ArgumentParser(description="日报表自动化套件")
+# 必须参数
+#parser.add_argument("input", help="输入文件路径")
+#parser.add_argument("output", help="输出文件路径")
+# 可选参数
+parser.add_argument("-v", "--verbose", action="store_true", help="显示详细日志")
+parser.add_argument("-dc", "--dateconfig", action="store_true", help="启用调试模式")
+args = parser.parse_args()
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 # 将 requests 库的日志级别设置为 DEBUG
-logging.getLogger('urllib3').setLevel(logging.DEBUG)
-
-working_datetime = env.work_datetime
-working_datetime_date  = working_datetime.date()
-
-logger.info(f'working date is: {working_datetime_date}')
+#logging.getLogger('urllib3').setLevel(logging.DEBUG)
 
 yesterday = date.today() - timedelta(days=1)
+#working_datetime =  datetime(2025, 3, 26)
+#working_datetime_date = working_datetime.date()
+working_datetime_date = yesterday
+working_datetime      = datetime.combine(yesterday, datetime.min.time())
 
-if working_datetime_date != yesterday:
-    choosen = input(f"The target date is {working_datetime_date}, are you sure to continue? y/n \nOr type 'yesterday' to use yesterday: ") or "n"
-    if choosen == "y":
-        pass  # 继续执行
-    elif choosen == "yesterday":
-        working_datetime_date = yesterday
-    else:
-        # 如果在函数内，可以使用 return 退出；如果在脚本中，可以使用 sys.exit()
-        import sys
-        sys.exit("操作已取消。")
+if args.dateconfig:
+    working_datetime = env.work_datetime
+    working_datetime_date  = working_datetime.date()
+
+elec_usage = electron.get_elecUsage(working_datetime_date)
+
+logger.info(f'working date is: {working_datetime_date}')
 
 dir_str     = f"{env.proj_dir}/et/{working_datetime_date.strftime('%m%d')}日报表"
 source_file = env.source_file
 save2file   = f"{dir_str}/2025年日报表.xlsx"
 
-mt = get_meituanSum()
-dy = get_douyinSum()
-english = get_operation_data()
+mt = get_meituanSum(working_datetime)
+dy = get_douyinSum(working_datetime)
+english = get_operation_data(working_datetime)
 
 if mt_status == 1:
     logger.debug("美团发生错误，检查cookie是否正确")
 
 
-elec = get_elecUsage()
-specialFee_list = specialFee.get_specialFee(reverse=False)        #可以排序
-
-manul_data = { "用电量":elec , "美团"  : mt , "抖音"  : dy }
+specialFee_list, special_sum = specialFee.get_specialFee(working_datetime)        #可以排序
 
 wb = load_workbook(source_file)
 ws = wb.active  # 或者指定具体的工作表，例如 wb["Sheet1"]
@@ -62,7 +66,7 @@ ws = wb.active  # 或者指定具体的工作表，例如 wb["Sheet1"]
 def load_data():
     chinese = {}
     data_pure = {
-        "用电量" : elec ,
+        "用电量" : elec_usage ,
         "美团"   : mt   ,
         "抖音"   : dy
     }
@@ -101,13 +105,15 @@ def load_data():
     return data_pure
 
 def insert_data(data_pure):
-    target_row = get_row_by_date(ws, working_datetime)
+    target_row = electron.get_row_by_date(ws, working_datetime_date)
     
     logger.info(f'target_row is {target_row}')
 
     for col in ws.iter_cols(min_row=2, max_row=2, min_col=1, max_col=29):
         header = col[0].value  # 第二行的列标题
         if header in data_pure:
+            #pdb.set_trace()
+            print(header,data_pure[header])
             ws.cell(row=target_row, column=col[0].column, value=data_pure[header])
 
     date_str = working_datetime.strftime("%-m月%-d日")
@@ -220,6 +226,7 @@ def A1Bug():
     ws['A1'] = rich_text
     font1 = Font(bold=True, size=16)
     ws['A1'].font = font1
+
 def handle_headers(ws):
     mcells = [ "f1", "j1", "n1", "s1", "w1", "ac1" ]
 
@@ -253,7 +260,6 @@ def save(path):
         print(f"创建目录时发生错误: {e}")
     try:
         shutil.move(source_file, f"{source_file}.old")
-        ws['Q28'].value = 'debullg'
         wb.save(source_file)
         wb.save(path)
     except FileNotFoundError:
@@ -263,8 +269,8 @@ def save(path):
 
 #判断specialFeesum和specialFee是否一致I#
 data_pure = load_data()
-if data_pure['特免'] != specialFee.sum:
-    logger.warn(f"特免金额不匹配，请检查!!运营数据中是{data_pure['特免']},订单列表中计算出来是{speciaFee.sum}")
+if data_pure['特免'] != special_sum:
+    logger.warn(f"特免金额不匹配，请检查!!运营数据中是{data_pure['特免']},订单列表中计算出来是{special_sum}")
 
 insert_data(data_pure)
 special_mark(specialFee_list)
