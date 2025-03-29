@@ -24,7 +24,7 @@ parser = argparse.ArgumentParser(description="日报表自动化套件")
 #parser.add_argument("output", help="输出文件路径")
 # 可选参数
 parser.add_argument("-v", "--verbose", action="store_true", help="显示详细日志")
-parser.add_argument("-dc", "--dateconfig", action="store_true", help="启用调试模式")
+parser.add_argument("-dc", "--dateconfig", action="store_true", help="使用配置文件的日期")
 args = parser.parse_args()
 
 logging.basicConfig(level=logging.DEBUG)
