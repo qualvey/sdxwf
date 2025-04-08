@@ -1,9 +1,10 @@
 from tools.iheader import headers as Iheaders
+from tools import logger
 
 import requests
 import math
 from datetime import datetime
-from tools import logger
+from collections import defaultdict
 
 logger=logger.get_logger('third_party')
 
@@ -45,53 +46,63 @@ def get_list(page : int,limit : int, startTm=None, endTm=None):
     return response_list
 
 
-def add_ids(date_str, item_list, container ):
+third_type_ids = defaultdict(list)
+def gen_duplicated_item_dict(date_str, item_list):
+    '''
+    item_list<list>[<dicrt>]
+    '''
     for item in  item_list:
         if item['reportDate'] == date_str:
-                container.append(item['id'])
-                logger.warning('有重复的日期，需要删除')
+            third_type = item['thirdType']
+            item_id = item['id']
+            third_type_ids[third_type].append(item_id)
+            logger.warning('有重复的日期，需要删除')
 
 def check_unique(date_str ):
+
     limit = 30
     startTm = date_str+' 00:00:00'
     endTm   = date_str+' 23:59:59'
-    repeat_ids = []
-
+    #调用函数获取列表
     response_list = get_list(page=1, limit=limit, startTm=startTm, endTm=endTm)
-    breakpoint()
-    
-    logger.info(response_list)
+    logger.debug(f'重复的数据列表{response_list}')
     total  = response_list['data']['total']
-    item_list = response_list['data']['rows']
+    data_list = response_list['data']['rows']
 
     if total>limit:
         pages = math.cell(total/limit)
         for page in range(1,pages+1):
-            add_ids(date_str, item_list, repeat_ids)
+            response_list = get_list(page=page, limit=limit, startTm=startTm, endTm=endTm)
+            logger.debug(f'重复的数据列表{response_list}')
+            total  = response_list['data']['total']
+            data_list = response_list['data']['rows']
+            gen_duplicated_item_dict(date_str, data_list )
 
-    add_ids(date_str, item_list, repeat_ids)
+    else:
+        gen_duplicated_item_dict(date_str, data_list )
+    return third_type_ids  
 
-    
-    return  (repeat_ids)
+def delete(id: str):
 
-def delete(ids: list[str]):
-    for id in ids:
-        delete = f'https://hub.sdxnetcafe.com/api/admin/third/income/delete/{id}'
-        response = requests.get(url = delete,headers=Iheaders)
-        print('正在删除', response.json())
+    delete = f'https://hub.sdxnetcafe.com/api/admin/third/income/delete/{id}'
+    response = requests.get(url = delete,headers=Iheaders)
 
-def ota_update(ota_name,date_obj, income):
+    if response.json()['status'] != 200:
+        return 1
+    else:
+        logger.warning('删除成功')
+        return 0
+    return 0
+
+def ota_update(ota_name,date_obj, income) :
     '''
         ota_name    <str>
-        date_obj    <datetime.datetime>
+        date_obj    <datetime.datetime> or <datetime.date>
         income      <int>
     '''
-
+    logger.warning(f'正在更新{ota_name}的数据--------')
     date_str = date_obj.strftime("%Y-%m-%d")
-
-    repeat_ids = check_unique(date_str)
-    delete(repeat_ids)
-
     data  = {"branchId":"a92fd8a33b7811ea87766c92bf5c82be","reportDate":date_str,"thirdType":ota_name,"income":income}
-    response = requests.post(url, headers=headers, json = data, timeout=10, verify = False)
-    print(response.text)
+    response = requests.post(url, headers=headers, json = data, timeout=10, verify = True)
+    logger.info(f'更新操作的返回结果{response.text}')
+    return response.json()

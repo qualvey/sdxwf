@@ -4,9 +4,11 @@ import tkinter as tk
 from datetime import datetime, date, timedelta
 import json
 from tools import env
-import logging
+from tools.logger import get_logger
 
 import sqlite3
+
+logger = get_logger(__name__)
 
 def init_db():
 # 连接到 SQLite 数据库（如果文件不存在，会自动创建）
@@ -100,43 +102,45 @@ def write_elecxl(elec_usage, target_row, destination):
     wb.save(destination)
 
 def get_elecUsage(datetime_obj):
-
-#这个可以用GUI
-#ele_usage   = env.configjson['elecUsage']
-# 函数，获取输入的值并赋给变量
+    #这个可以用GUI
+    #ele_usage   = env.configjson['elecUsage']
+    #函数，获取输入的值并赋给变量
     def on_enter_pressed(a):
         user_input = entry.get()  # 获取用户输入
         print(f"输入了用电量: {user_input}")  # 输出变量值
         # 如果需要将输入值存储为变量，可以在这里进一步处理
         ele_usage.set(user_input)  # 更新 my_variable 的值
         root.quit()
-
     search_date = datetime_obj
-    print(search_date)
+    if_exitst = query_data(search_date.strftime('%Y-%m-%d'))
+    if if_exitst:
+        logger.warning('该日期已经存在电表数据，如果要修改，请手动操作sqlite')
+        ele_usage = if_exitst
+    else:
 
-# 创建主窗口
-    root = tk.Tk()
-    root.title("电表数据")
-    root.geometry('300x300')
+        # 创建主窗口
+        root = tk.Tk()
+        root.title("输入电表数据")
+        root.geometry('300x300')
 
-# 创建输入框
-    entry = tk.Entry(root)
-    entry.pack(pady=10)
+        # 创建输入框
+        entry = tk.Entry(root)
+        entry.pack(pady=10)
 
 # 创建按钮，点击时获取输入框中的值
-    button = tk.Button(root, text=f"请输入用电量{search_date}", command=on_enter_pressed)
-    button.pack(pady=10)
+        button = tk.Button(root, text=f"请输入用电量{search_date}", command=on_enter_pressed)
+        button.pack(pady=10)
 
 # 创建一个显示变量的标签
-    ele_usage = tk.StringVar()
-    label = tk.Label(root, textvariable=ele_usage)
-    label.pack(pady=10)
-    entry.bind('<Return>', on_enter_pressed)
+        ele_usage = tk.StringVar()
+        label = tk.Label(root, textvariable=ele_usage)
+        label.pack(pady=10)
+        entry.bind('<Return>', on_enter_pressed)
 
 # 运行主循环
-    root.mainloop()
-    ele_usage = float(ele_usage.get())
-    update_sql_elec(datetime_obj, ele_usage)
+        root.mainloop()
+        ele_usage = float(ele_usage.get())
+        update_sql_elec(datetime_obj, ele_usage)
     previous_day = datetime_obj-timedelta(days=1)
     previous_day_str = previous_day.strftime('%Y-%m-%d')
     previous_day_value = query_data(previous_day_str)
