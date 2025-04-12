@@ -86,6 +86,7 @@ def get_uuid():
         prit('uuid error~!!')
     return uuid
 
+this is git test
 def show_img(response_qrcode):
     image = Image.open(BytesIO(response_qrcode.content))
         # 显示图片
