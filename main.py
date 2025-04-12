@@ -74,7 +74,6 @@ if not english:
 
 ota_update  = ThirdParty.ota_update
 repeat_ids = ThirdParty.check_unique(working_date_str)
-breakpoint()
 
 d_status = 0
 for thirdtype, ids in repeat_ids.items():
