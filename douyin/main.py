@@ -1,35 +1,25 @@
 import requests
 import json
 from http.cookies import SimpleCookie
-import datetime
+from datetime import datetime, timedelta
 import pytz
-import logging
 import argparse
 
+import time
 from tools import env
+from tools.logger import get_logger
 
-parser = argparse.ArgumentParser(description="抖音模块")
-parser.add_argument("-n", "--now", action="store_true", help="启用调试模式")
-args = parser.parse_args()
-
-#数据有可能不是一页。虽然调整请求参数的pagesize，不知道会不会被后端反爬
-
-# 配置日志记录
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
-# 将 requests 库的日志级别设置为 DEBUG
-#logging.getLogger('urllib3').setLevel(logging.DEBUG)
-
+logger = get_logger('DOUYIN')
 
 
 
 cookie          = env.configjson['cookies']['dy']
 url = "https://life.douyin.com/life/trade_view/v1/verify/verify_record_list/?page_index=1&page_size=20&industry=industry_common&root_life_account_id=7136075595087087628"
 
-def parse_cookie_string(cookie_string):
-    cookie = SimpleCookie()
-    cookie.load(cookie_string)
-    return {key: morsel.value for key, morsel in cookie.items()}
+#def parse_cookie_string(cookie_string):
+#    cookie = SimpleCookie()
+#    cookie.load(cookie_string)
+#    return {key: morsel.value for key, morsel in cookie.items()}
 
 headers = {
         "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:136.0) Gecko/20100101 Firefox/136.0",
@@ -54,14 +44,14 @@ headers = {
         "Sec-Fetch-Site": "same-origin",
         "Priority": "u=0"
     }
-cookies = parse_cookie_string(cookie)
+#cookies = parse_cookie_string(cookie)
 
-def get_douyin_data(date):
+def get_douyin_data(date,max_retries=5, delay=2):
 
-    today_start = datetime.datetime(date.year, date.month, date.day)
-    today_end = today_start + datetime.timedelta(hours=23, minutes=59, seconds=59)
+    today_start = datetime(date.year, date.month, date.day)
+    today_end = today_start + timedelta(hours=23, minutes=59, seconds=59)
 
-    print('抖音数据日期:', today_end)
+    print('抖音数据日期:', today_start,'-',today_end)
     # 转换为 Unix 时间戳（单位：秒）
     begin_timestamp = int(today_start.timestamp())
     end_timestamp = int(today_end.timestamp())
@@ -82,33 +72,54 @@ def get_douyin_data(date):
         "industry":"industry_common",
         "permission_common_param":{}
     }
-    try:
-        response = requests.post(url, json=post_data, headers=headers, cookies=cookies)
-        response.raise_for_status()  # 如果响应状态码不是 200，抛出异常
-        json_data = response.json()
-        logger.debug(f"抖音响应 JSON 数据成功 ")
-        with open(f"{env.proj_dir}/douyin/doyin.json",'w') as data_json:
-            json.dump(response.json(), data_json, ensure_ascii=False, indent=4)
-        return json_data
-    except requests.exceptions.RequestException as e:
-        logger.error(f"请求发生错误: {e}")
+    for attempt in range(max_retries):
+        try:
+            response = requests.post(url, json=post_data, headers=headers, cookies=cookie)
+            response.raise_for_status()  # 如果状态码不是 200，抛出异常
+            json_data = response.json()
+            logger.debug("抖音响应 JSON 数据成功")
 
-if __name__ == "__main__":
-    print(begin_timestamp)
-    print(end_timestamp)
-    print("总金额",sum)
+            with open("douyin.json", 'w', encoding='utf-8') as data_json:
+                json.dump(json_data, data_json, ensure_ascii=False, indent=4)
+
+            return json_data  # 请求成功，返回 JSON 数据
+        
+        except requests.exceptions.RequestException as e:
+            logger.error(f"请求发生错误（第 {attempt+1} 次尝试）：{e}")
+
+            if attempt < max_retries - 1:  # 如果还有重试机会，等待后重试
+                time.sleep(delay)  # 等待 delay 秒后重试
+            else:
+                logger.error("已达到最大重试次数，放弃请求")
+                return None  # 所有尝试都失败，返回 None
+
 
 def get_douyinSum(date):
     sum = 0
     json_data = get_douyin_data(date)
+
+    with open("douyin.json", 'w', encoding='utf-8') as data_json:
+        json.dump(json_data, data_json, ensure_ascii=False, indent=4)
     try:
         for item in json_data['data']['list']:
-            actual_amount = item['sku']['amount']['actual_amount']
-            sum+=actual_amount/100
+            #actual_amount = item['sku']['amount']['actual_amount']
+            verify_amount = item['amount']['verify_amount']
+            print(verify_amount)
+            sum += verify_amount/100
     except:
         pass
     if sum==0:
         return None
     return sum
 
+
+
+if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser(description="抖音模块")
+    parser.add_argument("-n", "--now", action="store_true", help="启用调试模式")
+    args = parser.parse_args()
+    sum =    get_douyinSum(datetime.today())
+
+    print("总金额",sum)
 
