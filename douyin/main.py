@@ -120,6 +120,4 @@ if __name__ == "__main__":
     parser.add_argument("-n", "--now", action="store_true", help="启用调试模式")
     args = parser.parse_args()
     sum =    get_douyinSum(datetime.today())
-
     print("总金额",sum)
-
