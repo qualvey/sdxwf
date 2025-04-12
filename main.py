@@ -1,9 +1,8 @@
 import shutil
 import pdb
 import os
-import logging
 import argparse
-from datetime   import datetime, date, timedelta
+from datetime   import datetime, date, timedelta, time
 from copy       import copy
 
 from openpyxl                import load_workbook
@@ -14,9 +13,14 @@ from openpyxl.cell.rich_text import CellRichText, TextBlock, TextBlock
 from meituan.main       import get_meituanSum, mt_status
 from douyin.main        import get_douyinSum
 from operation.main     import get_operation_data
+from operation import ThirdParty
 from operation import elecdata as electron
 from specialFee      import main as specialFee
 from tools              import env
+from tools.logger import get_logger
+
+logger = get_logger(__name__)
+logger.info('程序运行中')
 
 parser = argparse.ArgumentParser(description="日报表自动化套件")
 # 必须参数
@@ -25,24 +29,32 @@ parser = argparse.ArgumentParser(description="日报表自动化套件")
 # 可选参数
 parser.add_argument("-v", "--verbose", action="store_true", help="显示详细日志")
 parser.add_argument("-dc", "--dateconfig", action="store_true", help="使用配置文件的日期")
+parser.add_argument("-now", "--today", action="store_true", help="使用今天作为日期")
+parser.add_argument("-ne", "--no-elec", action="store_true", help="不输入电表数据")
+
 args = parser.parse_args()
 
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
-# 将 requests 库的日志级别设置为 DEBUG
-#logging.getLogger('urllib3').setLevel(logging.DEBUG)
-
 yesterday = date.today() - timedelta(days=1)
-#working_datetime =  datetime(2025, 3, 26)
-#working_datetime_date = working_datetime.date()
 working_datetime_date = yesterday
+working_date_str      = yesterday.strftime('%Y-%m-%d')
 working_datetime      = datetime.combine(yesterday, datetime.min.time())
 
-if args.dateconfig:
-    working_datetime = env.work_datetime
-    working_datetime_date  = working_datetime.date()
+working_datetime_date = working_datetime.date()
 
-elec_usage = electron.get_elecUsage(working_datetime_date)
+if args.dateconfig:
+    working_datetime = env.working_datetime
+    working_datetime_date  = working_datetime.date()
+if args.today:
+    working_datetime_date = datetime.today()
+    working_date_str      = working_datetime_date.strftime('%Y-%m-%d')
+    working_datetime      = datetime.combine(working_datetime_date, datetime.min.time())
+
+if args.no_elec:
+    elec_usage = None
+else:
+    elec_usage = electron.get_elecUsage(working_datetime_date)
+    if not elec_usage:
+        logger.warning('电表数据获取错误，请检查')
 
 logger.info(f'working date is: {working_datetime_date}')
 
@@ -51,12 +63,31 @@ source_file = env.source_file
 save2file   = f"{dir_str}/2025年日报表.xlsx"
 
 mt = get_meituanSum(working_datetime)
+if not mt:
+    logger.warning('美团数据没拿到')
 dy = get_douyinSum(working_datetime)
+if not dy:
+    logger.warning('抖音数据没有拿到')
 english = get_operation_data(working_datetime)
+if not english:
+    logger.warning('运营数据没拿到')
 
-if mt_status == 1:
-    logger.debug("美团发生错误，检查cookie是否正确")
+ota_update  = ThirdParty.ota_update
+repeat_ids = ThirdParty.check_unique(working_date_str)
+breakpoint()
 
+d_status = 0
+for thirdtype, ids in repeat_ids.items():
+    for id in ids:
+        logger.info(f'正在删除{thirdtype}:{id}')
+        delete_status = ThirdParty.delete(id)
+        if delete_status == 1:
+            logger.warning(f'删除失败，不添加')
+            d_status = 1
+if d_status == 0:
+    logger.info('删除成功')
+    ota_update(ota_name='DOUYIN', date_obj=working_datetime, income=dy)
+    ota_update(ota_name='MEITUAN', date_obj=working_datetime, income=mt)
 
 specialFee_list, special_sum = specialFee.get_specialFee(working_datetime)        #可以排序
 
