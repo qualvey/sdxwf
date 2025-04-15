@@ -1,0 +1,13 @@
+openpyxl
+pytz
+requests
+colorama
+#aa
+mysql-connector-python
+coloredlogs
+
+schedule
+
+#app
+flask
+flask-login
