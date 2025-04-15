@@ -55,7 +55,7 @@ headers = {
         "Priority": "u=0"
     }
 
-def get_douyin_data(date,max_retries=5, delay=2):
+def fetch_douyin_data(date,max_retries=5, delay=2):
     '''
     date<datetime.date>
     '''
@@ -90,6 +90,7 @@ def get_douyin_data(date,max_retries=5, delay=2):
             response.raise_for_status()  # 如果状态码不是 200，抛出异常
             douyin_json = response.json()
             logger.debug("请求抖音数据已经成功.")
+            logger.debug(json.dumps(douyin_json, indent=4, ensure_ascii=False))
 
             with open(f"{env.proj_dir}/douyin/douyin.json", 'w', encoding='utf-8') as data_json:
                 json.dump(douyin_json, data_json, ensure_ascii=False, indent=4)
@@ -105,25 +106,89 @@ def get_douyin_data(date,max_retries=5, delay=2):
                 logger.error("抖音已达到最大重试次数，放弃请求")
                 return None  # 所有尝试都失败，返回 None
 
-def get_douyinSum(date):
+def get_douyin_data(date):
     '''
     date<datetime.date>
     '''
     sum = 0
-    douyin_json = get_douyin_data(date)
+    douyin_json = fetch_douyin_data(date)
+    try:
+        dy_list = douyin_json['data']['list']
+        dy_len  = len(dy_list)
+    except KeyError as e:
+        breakpoint()
+        logger.error(f'返回中不存在期待的键，报错。{e}')
+        return None, None
 
-    for item in douyin_json['data']['list']:
+    for item in dy_list:
         verify_amount = item['amount']['verify_amount']
         logger.info(f'抖音数据:{verify_amount}')
         sum += verify_amount/100
     if sum==0:
         return None
     else:
-        return sum
+        return sum, dy_len
+
+def get_dygood_rate(date):
+
+    date_start = datetime(date.year, date.month, date.day)
+    date_end = date_start + timedelta(hours=23, minutes=59, seconds=59)
+
+    # 转换为 Unix 时间戳（单位：秒）
+    # datetime对象有timestamp方法
+    begin_timestamp = int(date_start.timestamp())
+    end_timestamp   = int(date_end.timestamp())
+
+    scheme   =  "https"
+    host     =  "life.douyin.com"
+    filename =  "/life/infra/v1/review/get_review_list/"
+
+    url      = f'{scheme}://{host}{filename}'
+    query  = {
+        "life_account_ids": "7306781201124149300",
+        "poi_id": "6828149180763080708",
+        "tags": "1,9,5,4,10,8,7,50,",
+        "sort_by": "2",
+        "life_account_id": "7136075595087087628",
+        "query_time_start": begin_timestamp,
+        "query_time_end": end_timestamp,
+        "search_after": "",
+        "cursor": "0",
+        "count": "10",
+        "top_rate_ids": "",
+        "reply_display_by_level": "1",
+        "root_life_account_id": "7136075595087087628",
+        "store_type": "2",
+        "source": "1"
+        }
+
+
+    response = requests.get(
+        url = url ,
+        params = query,
+        headers = headers,
+        cookies = cookie
+        )
+
+    data = response.json()
+    response_list = data['data']['reviews']
+    logger.debug('get_good_rate:\n')
+    logger.debug(json.dumps(response_list, indent = 4, ensure_ascii=False))
+    list_len = len(response_list)
+    return list_len
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="抖音模块")
     parser.add_argument("-n", "--now", action="store_true", help="启用调试模式")
+    parser.add_argument("-d", "--date", type=str, help="指定日期")
     args = parser.parse_args()
-    sum =    get_douyinSum(datetime.today() - timedelta(days=1))
-    logger.info("抖音总金额",sum)
+    if args.date:
+        date = datetime.strptime(args.date, "%Y-%m-%d")
+        logger.info(f'date: {date}')
+        sum, len_of_list = get_douyin_data(date)
+        good_rates = get_dygood_rate(date)
+        logger.info(f'好评数量：{good_rates}')
+    else:
+        sum, len_of_list =    get_douyin_data(datetime.today() - timedelta(days=1))
+    logger.info(f"抖音总金额: {sum}")

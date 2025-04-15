@@ -11,8 +11,8 @@ from openpyxl.cell.text      import InlineFont
 from openpyxl.cell.rich_text import CellRichText, TextBlock, TextBlock
 from openpyxl.utils import column_index_from_string, get_column_letter
 
-from meituan.main       import get_meituanSum, mt_status
-from douyin.main        import get_douyinSum
+from meituan.main       import get_meituanSum, mt_status, get_mtgood_rates
+from douyin.main        import get_douyin_data, get_dygood_rate
 from operation.main     import resolve_operation_data
 from operation import ThirdParty
 from operation import elecdata as electron
@@ -71,10 +71,10 @@ dir_str     = f"{env.proj_dir}/et/{working_datetime_date.strftime('%m%d')}日报
 source_file = env.source_file
 save2file   = f"{dir_str}/2025年日报表.xlsx"
 
-mt = get_meituanSum(working_datetime)
+mt, mt_len = get_meituanSum(working_datetime)
 if not mt:
     logger.warning('美团数据没拿到')
-dy = get_douyinSum(working_datetime)
+dy, dy_len = get_douyin_data(working_datetime)
 if not dy:
     logger.warning('抖音数据没有拿到')
 english = resolve_operation_data(working_datetime)
@@ -263,7 +263,7 @@ def old_special_mark(special_data):
         yuan.alignment = center_alignment
 
 
-def special_mark(ws, special_data, start_col, end_col, start_row=37, end_row=57):
+def special_mark(ws, special_data, start_col, end_col, start_row=37, end_row=47):
     left_alignment = Alignment(horizontal='left')
     center_alignment = Alignment(horizontal='center')
 
@@ -316,8 +316,10 @@ def special_mark(ws, special_data, start_col, end_col, start_row=37, end_row=57)
     ws[f'{yuan_col}{bottom}'].border        = Border(bottom=dotted, right=medium)
 
     # 写入数据
+    titlecell = ws.cell(row=37, column=start_col_index)
+    titlecell.value = "特免明细:"
     for index, item in enumerate(special_data):
-        row = start_row + index
+        row = start_row+1 + index
         if row >= end_row:
             break
         if '：' in item:
@@ -332,6 +334,22 @@ def special_mark(ws, special_data, start_col, end_col, start_row=37, end_row=57)
         yuan_cell = ws.cell(row=row, column=end_col_index)
         yuan_cell.value = "元"
         yuan_cell.alignment = center_alignment
+
+def ota_comment(mt_len, dy_len, column):
+
+    left_alignment = Alignment(horizontal='left')
+    center_alignment = Alignment(horizontal='center')
+
+    col_index = column_index_from_string(column)
+
+    title = ws.cell(row = 53, column = col_index)
+    dycell = ws.cell(row = 55, column = col_index)
+    mtcell = ws.cell(row = 56, column = col_index)
+    dycell.alignment = left_alignment
+    mtcell.alignment = left_alignment
+    title.value  = f'OTA平台线上评价：'
+    mtcell.value = f"美团：{mt_len}单  好评数：{get_mtgood_rates(working_datetime.strftime('%Y-%m-%d'))}个"
+    dycell.value = f'抖音：{dy_len}单  好评数：{get_dygood_rate(working_datetime)}个'
 
 
 def A1Bug():
@@ -398,5 +416,6 @@ insert_data(data_pure)
 
 
 special_mark(ws = ws, special_data = specialFee_list, start_col='H', end_col='K' )
+ota_comment(mt_len, dy_len, 'H')
 handle_headers(ws)
 save(save2file)

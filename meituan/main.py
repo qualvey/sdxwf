@@ -86,6 +86,7 @@ def get_meituanSum(date):
 
     sale_price_sum = 0
     couponRecordDetails = json_data["data"]["couponRecordDetails"]
+    mt_len              = json_data['data']['recordSum']
 
     if  couponRecordDetails:           
         for record in couponRecordDetails:
@@ -95,13 +96,76 @@ def get_meituanSum(date):
             print(sale_price)
             sale_price_sum += float(sale_price)
             sale_price_sum = round(sale_price_sum, 2) 
-    return sale_price_sum
+    return sale_price_sum, mt_len
+
+
+def get_mtgood_rates(date):
+
+    '''
+        date<str>
+        query time range<string %Y-%mp-%d>
+    '''
+
+    scheme   = "https"
+    host     = "e.dianping.com"
+    filename =  "/review/app/index/ajax/pcreview/listV2"
+    url_comment =  f'{scheme}://{host}{filename}'
+    query    = {
+        "platform": "1",
+        "shopIdStr": "1340799757",
+        "tagId": "1",
+        "startDate": date,
+        "endDate": date,
+        "pageNo": "1",
+        "pageSize": "20",
+        "referType": "0",
+        "category": "0",
+        "yodaReady": "h5",
+        "csecplatform": "4",
+        "csecversion": "3.1.0",
+        "mtgsig": "{\"a1\":\"1.2\",\"a2\":1744742288824,\"a3\":\"1740084568043CAMCCCC2960edaad10e294fa6f28397fe2285903389\",\"a5\":\"0Gj96O8oa4QSDdx7vLmthAfRTKAsrA739yHO+2oNMQ+qe40zyFH=\",\"a6\":\"hs1.6bdBbku5qBC9y8yYYsjGEJJyStbDulDRGAcHdVhidjC5Wa3kcaa5bio2L+EktgYXQpUI9r7xs1YaEsFME60N3kIQY7nNxQNCThkddZLuAIIsZUZjXUkbXBJ5UI4+OsO9a\",\"a8\":\"d5f8e4bebeaa405401d4eae22514af44\",\"a9\":\"3.1.0,7,209\",\"a10\":\"0c\",\"x0\":4,\"d1\":\"8d7b1e4070d501d7382a8b49fdae1f9c\"}"
+    }
+
+    headers_comment = {
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Encoding": "gzip, deflate, br, zstd",
+    "Accept-Language": "zh,en-US;q=0.7,en;q=0.3",
+    "Cache-Control": "no-cache",
+    "Connection": "keep-alive",
+    "Host": "e.dianping.com",
+    "Pragma": "no-cache",
+    "Priority": "u=0",
+    "Referer": "https://e.dianping.com/vg-platform-reviewmanage/shop-comment-mt/index.html",
+    "Sec-Fetch-Dest": "empty",
+    "Sec-Fetch-Mode": "cors",
+    "Sec-Fetch-Site": "same-origin",
+    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:137.0) Gecko/20100101 Firefox/137.0"
+    }
+    response = requests.get(url=url_comment, params = query, cookies = cookies ,headers = headers_comment)
+    #breakpoint()
+    data_json = response.json()
+    high_rates = data_json['msg']['totalReivewNum']
+    return high_rates
+    
 
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="美团组件")
     parser.add_argument("-n", "--now", action="store_true", help="今天的数据")
+    parser.add_argument("-d", "--date", type=str, help="今天的数据")
     args = parser.parse_args()
-    yesterday =datetime.today()-timedelta(days=1) 
-    mtsum = get_meituanSum(yesterday)
-    logger.info(f'美团数据{yesterday}: {mtsum}')
+    if args.date:
+        working_date = args.date
+        date_obj = datetime.strptime(working_date, "%Y-%d-%m")
+        logger.info(f"美团日期{working_date}")
+        mtsum, mtlen = get_meituanSum(date_obj)
+        logger.info(f'美团数据: {mtsum}')
+        googs_rates = get_mtgood_rates(working_date)
+        logger.info(f'美团改日好评数量{googs_rates}')
+
+    else:
+
+        yesterday =datetime.today()-timedelta(days=1) 
+        mtsum = get_meituanSum(yesterday)
+        logger.info(f'美团数据{yesterday}: {mtsum}')
+
