@@ -86,7 +86,6 @@ def get_uuid():
         prit('uuid error~!!')
     return uuid
 
-this is git test
 def show_img(response_qrcode):
     image = Image.open(BytesIO(response_qrcode.content))
         # 显示图片
@@ -235,7 +234,7 @@ def image_to_base64(image):
     return img_str
 
 # 启用 CORS
-CORS(app)
+CORS(app, origins=['http://localhost:5173'])
 
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -343,7 +342,6 @@ def meituan():
     return jsonify(data)
 
 @app.route('/dydata', methods=['get'])
-@login_required
 def douyin():
 
     date = request.args.get('date')

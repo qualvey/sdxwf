@@ -9,18 +9,28 @@ import time
 from tools import env
 from tools.logger import get_logger
 
-logger = get_logger('DOUYIN')
-
-
+logger = get_logger(__name__)
 
 cookie          = env.configjson['cookies']['dy']
-url = "https://life.douyin.com/life/trade_view/v1/verify/verify_record_list/?page_index=1&page_size=20&industry=industry_common&root_life_account_id=7136075595087087628"
+scheme  = 'https://'
+host    = 'life.douyin.com'
+api     = '/life/trade_view/v1/verify/verify_record_list/'
+params  = {
+    'page_index': 1,
+    'page_size' : 20,
+    'industry'  : 'industry_common', 
+    'root_life_account_id' : '7136075595087087628'
+}
+
+url  = f'{scheme}{host}{api}'
 
 #def parse_cookie_string(cookie_string):
 #    cookie = SimpleCookie()
 #    cookie.load(cookie_string)
 #    return {key: morsel.value for key, morsel in cookie.items()}
 
+common_headers = {
+}
 headers = {
         "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:136.0) Gecko/20100101 Firefox/136.0",
         "Accept": "application/json, text/plain, */*",
@@ -44,15 +54,17 @@ headers = {
         "Sec-Fetch-Site": "same-origin",
         "Priority": "u=0"
     }
-#cookies = parse_cookie_string(cookie)
 
 def get_douyin_data(date,max_retries=5, delay=2):
+    '''
+    date<datetime.date>
+    '''
 
     today_start = datetime(date.year, date.month, date.day)
     today_end = today_start + timedelta(hours=23, minutes=59, seconds=59)
 
-    print('抖音数据日期:', today_start,'-',today_end)
     # 转换为 Unix 时间戳（单位：秒）
+    # datetime对象有timestamp方法
     begin_timestamp = int(today_start.timestamp())
     end_timestamp = int(today_end.timestamp())
 
@@ -74,15 +86,15 @@ def get_douyin_data(date,max_retries=5, delay=2):
     }
     for attempt in range(max_retries):
         try:
-            response = requests.post(url, json=post_data, headers=headers, cookies=cookie)
+            response = requests.post(url, params=params, json=post_data, headers=headers, cookies=cookie)
             response.raise_for_status()  # 如果状态码不是 200，抛出异常
-            json_data = response.json()
-            logger.debug("抖音响应 JSON 数据成功")
+            douyin_json = response.json()
+            logger.debug("请求抖音数据已经成功.")
 
-            with open("douyin.json", 'w', encoding='utf-8') as data_json:
-                json.dump(json_data, data_json, ensure_ascii=False, indent=4)
+            with open(f"{env.proj_dir}/douyin/douyin.json", 'w', encoding='utf-8') as data_json:
+                json.dump(douyin_json, data_json, ensure_ascii=False, indent=4)
 
-            return json_data  # 请求成功，返回 JSON 数据
+            return douyin_json  # 请求成功，返回 JSON 数据
         
         except requests.exceptions.RequestException as e:
             logger.error(f"请求发生错误（第 {attempt+1} 次尝试）：{e}")
@@ -90,34 +102,28 @@ def get_douyin_data(date,max_retries=5, delay=2):
             if attempt < max_retries - 1:  # 如果还有重试机会，等待后重试
                 time.sleep(delay)  # 等待 delay 秒后重试
             else:
-                logger.error("已达到最大重试次数，放弃请求")
+                logger.error("抖音已达到最大重试次数，放弃请求")
                 return None  # 所有尝试都失败，返回 None
 
-
 def get_douyinSum(date):
+    '''
+    date<datetime.date>
+    '''
     sum = 0
-    json_data = get_douyin_data(date)
+    douyin_json = get_douyin_data(date)
 
-    with open("douyin.json", 'w', encoding='utf-8') as data_json:
-        json.dump(json_data, data_json, ensure_ascii=False, indent=4)
-    try:
-        for item in json_data['data']['list']:
-            #actual_amount = item['sku']['amount']['actual_amount']
-            verify_amount = item['amount']['verify_amount']
-            print(verify_amount)
-            sum += verify_amount/100
-    except:
-        pass
+    for item in douyin_json['data']['list']:
+        verify_amount = item['amount']['verify_amount']
+        logger.info(f'抖音数据:{verify_amount}')
+        sum += verify_amount/100
     if sum==0:
         return None
-    return sum
-
-
+    else:
+        return sum
 
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser(description="抖音模块")
     parser.add_argument("-n", "--now", action="store_true", help="启用调试模式")
     args = parser.parse_args()
-    sum =    get_douyinSum(datetime.today())
-    print("总金额",sum)
+    sum =    get_douyinSum(datetime.today() - timedelta(days=1))
+    logger.info("抖音总金额",sum)

@@ -1,5 +1,13 @@
-2025-04-08 00:54:15,291 - third_party - DEBUG - 重复的数据列表{'status': 200, 'data': {'total': 0, 'rows': []}}
-2025-04-08 00:54:17,114 - third_party - WARNING - 正在更新DOUYIN�2025-04-08 00:54:25,548 - __main__ - INFO - target_row is 9
- - 更新操作的返回结果{"status":200}
-2025-04-08 00:54:19,453 - third_party - WARNING - 正在更新MEITUAN的数据--------
-2025-04-08 00:54:21,553 - third_party - INFO - 更新操作的返回结果{"status":200}
+2025-04-11 01:23:07,590 - third_party - DEBUG - 重复的数据列表{'status': 200, 'data': {'total': 2, 'rows': [{'id': 'd3a8be4a12025-04-11 01:23:12,787 - __main__ - INFO - 正在删除DOUYIN:d3a8be4a162c11f0ba120c42a1b7a8c6
+2025-04-11 01:23:13,007 - __main__ - INFO - 正在删除MEITUAN:d3b630cf162c11f0a2d8b8599fc9096c
+2025-04-11 01:23:13,103 - __main__ - INFO - 删除成功
+2025-04-11 01:23:14,684 - __main__ - INFO - target_row is 12
+YIN', 'income': 314.0, 'creator': '李龙涛', 'thirdTypeDesc': '抖音', 'branchName': '树呆熊芜湖张家山店'}, {'id': 'd3b630cf162c11f0a2d8b8599fc9096c', 'createdTime': '2025-04-11 00:57:03', 'createdBy': 'f68f0b33c8e011efa2d8b8599fc9096c', 'updatedTime': '2025-04-11 00:57:03', 'updatedBy': 'f68f0b33c8e011efa2d8b8599fc9096c', 'deleted': False, 'branchId': 'a92fd8a33b7811ea87766c92bf5c82be', 'reportDate': '2025-04-10', 'thirdType': 'MEITUAN', 'income': 325.6, 'creator': '李龙涛', 'thirdTypeDesc': '美团', 'branchName': '树呆熊芜湖张家山店'}]}}
+2025-04-11 01:23:07,590 - third_party - WARNING - 有重复的日期，需要删除
+2025-04-11 01:23:07,590 - third_party - WARNING - 有重复的日期，需要删除
+2025-04-11 01:23:13,007 - third_party - WARNING - 删除成功
+2025-04-11 01:23:13,103 - third_party - WARNING - 删除成功
+2025-04-11 01:23:13,103 - third_party - WARNING - 正在更新DOUYIN的数据--------
+2025-04-11 01:23:13,344 - third_party - INFO - 更新操作的返回结果{"status":200}
+2025-04-11 01:23:13,345 - third_party - WARNING - 正在更新MEITUAN的数据--------
+2025-04-11 01:23:13,432 - third_party - INFO - 更新操作的返回结果{"status":200}

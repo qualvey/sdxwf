@@ -1,4 +1,4 @@
-from tools import env
+from tools.login import token
 
 raw_header = """
 Host: hub.sdxnetcafe.com
@@ -13,17 +13,22 @@ Sec-Fetch-Mode: cors
 Sec-Fetch-Site: same-origin
 Priority: u=0
 """
+
+
 headers = {}
-headers['Authorization'] = env.configjson['Authorization']
+headers['Authorization'] =token 
+def raw_header_to_json(raw_header):
 
-lines = raw_header.splitlines()
-for line in lines:
-    # 跳过空行
-    if line.strip():
-        # 将每行按照第一个冒号拆分为键和值
-        key, value = line.split(":", 1)
-        # 去除键和值的多余空白，并添加到字典中
-        headers[key.strip()] = value.strip()
+    lines = raw_header.splitlines()
 
-# 输出解析后的请求
-#::contentReference[oaicite:0]{index=0}
+    for line in lines:
+        # 跳过空行
+        if line.strip():
+            # 将每行按照第一个冒号拆分为键和值
+            key, value = line.split(":", 1)
+            # 去除键和值的多余空白，并添加到字典中
+            headers[key.strip()] = value.strip()
+    return headers
+
+raw_header_to_json(raw_header)
+

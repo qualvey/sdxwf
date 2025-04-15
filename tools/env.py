@@ -70,13 +70,9 @@ configjson  = {}
 with open(config_file, 'r',encoding="UTF-8") as config:
     configjson = json.loads(config.read())
 
-work_datetime = datetime.strptime(configjson['date'], "%Y-%m-%d")
-date_str = work_datetime.strftime("%-m月%-d日")
+working_datetime = datetime.strptime(configjson['date'], "%Y-%m-%d")
+date_str = working_datetime.strftime("%-m月%-d日")
 
-begin_timestamp_mt  = get_timestamp(work_datetime,unit="ms")
-end_timestamp_mt    = get_timestamp(work_datetime, end_of_day=True, unit="ms")
-begin_timestamp_dy  = get_timestamp(work_datetime,unit="s")
-end_timestamp_dy    = get_timestamp(work_datetime, end_of_day=True, unit="s")
 
 print(dir())
 if __name__ == "__main__":

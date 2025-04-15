@@ -26,6 +26,12 @@ def init_db():
     cursor.execute(create_table_query)
     conn.commit()
 
+def is_float(s):
+    try:
+        float(s)
+        return True
+    except ValueError:
+        return False
 
 def update_sql_elec(record_date, energy_consumed):
     init_db()
@@ -62,7 +68,6 @@ def query_data(date_str):
         print(row)
         return(row[0])
 
-
 elecSheet   = env.elecUsage_file
 
 wb = load_workbook(elecSheet)
@@ -92,7 +97,8 @@ def get_row_by_date(worksheet,search_value,start_cell="A1",end_cell="A35"):
         print(f"错误: {start_cell} 或 {end_cell} 可能超出了工作表范围")
         return None
 
-
+class UserCancledException(Exception):
+    pass
 def write_elecxl(elec_usage, target_row, destination):
     if not target_row :
         print('电表有问题，未获取正确的位置')
@@ -144,15 +150,34 @@ def get_elecUsage(datetime_obj):
     previous_day = datetime_obj-timedelta(days=1)
     previous_day_str = previous_day.strftime('%Y-%m-%d')
     previous_day_value = query_data(previous_day_str)
-    print(previous_day_value)
-    result = ele_usage - previous_day_value
+    logger.info(previous_day_value)
+    if previous_day_value:
+        result = ele_usage - previous_day_value
+    else:
+        logger.warn(f'前一天<{previous_day.__str__()}>的数据不存在,是否添加? y<int>/n')
+        user_input = input(f'输入y紧跟电表数据\n').strip().lower()
+        if user_input.startswith("y") and is_float(user_input[1:]):
+            pre_day_value = float(user_input[1:])
+            result = ele_usage - pre_day_value
+            conn = sqlite3.connect(f'{env.proj_dir}/energy_data.db')
+            cursor = conn.cursor()
+            record_date = previous_day.strftime('%Y-%m-%d')
+            try:
+                insert_query = '''
+                INSERT INTO daily_energy_consumption (record_date, energy_consumed)
+                VALUES (?, ?)
+                ON CONFLICT(record_date) DO UPDATE SET energy_consumed = excluded.energy_consumed;
+                '''
+                cursor.execute(insert_query, (record_date, pre_day_value))
+                conn.commit()
+                print("数据插入成功")
+            except sqlite3.Error as err:
+                print(f"插入数据时发生错误: {err}")
+        else: 
+            logger.warn(f'user_input.startswith(\'y\'):{user_input.startswith('y')}, user_input[1:].isdigit():{user_input[1:]}')
+            raise UserCancledException('用户取消，电表模块退出')
 
-    #target_row = get_row_by_date(ws,search_date)
-    #directory = f"{env.proj_dir}/et/{datetime_obj.strftime('%m%d')}电表"
-    #save_dest   = f"{directory}/elec.xlsx"
-    #os.makedirs(directory, exist_ok=True)
-    #write_elecxl(ele_usage, target_row, save_dest)
-    #result = ele_usage - ws[f'B{target_row - 1}'].value
+
     result = result*80
     return int(result) 
 

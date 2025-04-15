@@ -3,10 +3,14 @@ from tools import logger
 
 import requests
 import math
+import json 
 from datetime import datetime
 from collections import defaultdict
 
 logger=logger.get_logger('third_party')
+
+scheme='https://'
+hostname = 'hub.sdxnetcafe.com'
 
 raw_header = """ Host: hub.sdxnetcafe.com
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:136.0) Gecko/20100101 Firefox/136.0
@@ -35,12 +39,12 @@ for line in lines:
         # 去除键和值的多余空白，并添加到字典中
         headers[key.strip()] = value.strip()
 
-url = 'https://hub.sdxnetcafe.com/api/admin/third/income/save'
+saveurl = 'https://hub.sdxnetcafe.com/api/admin/third/income/save'
 
 
 #delete = f'https://hub.sdxnetcafe.com/api/admin/third/income/delete/{id}'
 def get_list(page : int,limit : int, startTm=None, endTm=None):
-    list_thirdpaty = f'https://hub.sdxnetcafe.com/api/admin/third/income/pageList?branchId=a92fd8a33b7811ea87766c92bf5c82be&startTm={startTm}&endTm={endTm}&page={page}&limit={limit}'
+    list_thirdpaty = f'{scheme}{hostname}/api/admin/third/income/pageList?branchId=a92fd8a33b7811ea87766c92bf5c82be&startTm={startTm}&endTm={endTm}&page={page}&limit={limit}'
     response = requests.get(url = list_thirdpaty, headers=Iheaders, timeout=10, verify = True)
     response_list = response.json()
     return response_list
@@ -65,7 +69,8 @@ def check_unique(date_str ):
     endTm   = date_str+' 23:59:59'
     #调用函数获取列表
     response_list = get_list(page=1, limit=limit, startTm=startTm, endTm=endTm)
-    logger.debug(f'重复的数据列表{response_list}')
+    fmt_list = json.dumps(response_list, ensure_ascii=False, indent=4)
+    logger.debug(f'\n重复的数据列表:\n{fmt_list}')
     total  = response_list['data']['total']
     data_list = response_list['data']['rows']
 
@@ -85,7 +90,7 @@ def check_unique(date_str ):
 def delete(id: str):
 
     delete = f'https://hub.sdxnetcafe.com/api/admin/third/income/delete/{id}'
-    response = requests.get(url = delete,headers=Iheaders)
+    response = requests.get(url = delete,headers=Iheaders, timeout = 7)
 
     if response.json()['status'] != 200:
         return 1
@@ -103,6 +108,6 @@ def ota_update(ota_name,date_obj, income) :
     logger.warning(f'正在更新{ota_name}的数据--------')
     date_str = date_obj.strftime("%Y-%m-%d")
     data  = {"branchId":"a92fd8a33b7811ea87766c92bf5c82be","reportDate":date_str,"thirdType":ota_name,"income":income}
-    response = requests.post(url, headers=headers, json = data, timeout=10, verify = True)
+    response = requests.post(url = saveurl, headers=headers, json = data, timeout=10, verify = True)
     logger.info(f'更新操作的返回结果{response.text}')
     return response.json()

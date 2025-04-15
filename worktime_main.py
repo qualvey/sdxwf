@@ -6,11 +6,16 @@ from openpyxl.utils import get_column_letter
 from openpyxl.cell.text import InlineFont
 from openpyxl.cell.rich_text import TextBlock, CellRichText
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
 from urllib.parse import urlencode,urlunparse
 
 from worktime import get_userid, consume_duration
-from tools import env, iheader, find
+from tools import env, iheader, find, logger
+
+logger = logger.get_logger(__name__)
+
+userid_map = get_userid.userids
+#dict
 
 work_time_xl = f"{env.proj_dir}/et/2025年3月工时表.xlsx"
 workbook = load_workbook(work_time_xl)
@@ -18,7 +23,8 @@ worksheet = workbook.active
 
 #today = datetime.today()-timedelta(days=8)
 today = datetime.today()
-print(today.weekday())
+today_datetime = datetime.combine(today, time.min)
+breakpoint()
 
 duration_sum = {}
 
@@ -31,34 +37,37 @@ def get_previous_week_range(dt):
     last_sunday = dt - timedelta(days=days_since_last_sunday)
     # 计算上周一的日期
     last_monday = last_sunday - timedelta(days=6)
+    last_monday = datetime.combine(last_monday, time.min)
     week_dates = [last_monday + timedelta(days=i) for i in range(7)]
     return week_dates
 
 weekdays = get_previous_week_range(today)
 
 obj_mon = weekdays[0]
-obj_sun = weekdays[6]
+obj_sun = datetime.combine(weekdays[6], time.max)
 mon = str(obj_mon)
 sun = str(obj_sun)
 
-print('请求的日期范围:', mon,sun)
+logger.debug(f'请求的日期范围:{str(mon),str(sun)}' )
+print(f'请求的日期范围:{str(mon),str(sun)}' )
 
-scheme = 'https'
-netloc = 'hub.sdxnetcafe.com'
-path = '/api/admin/work/attendance/list'
-params =''
-fragment = ''
 
 def get_total_wduration(data_json):
-    duration_sum = 0
+    get_total_wduration.call_count+=1
+    sum = 0
     if data_json['data']['total'] == 7:
         data_list = data_json['data']['rows'] 
     else:
         print("not 7days") 
         data_list = data_json['data']['rows'] 
+
     for item in data_list:
-        duration_sum += item['duration']
-    return duration_sum
+        name  = item['userName']
+        print(name)
+        sum += item['duration']
+    return sum
+
+get_total_wduration.call_count = 0
 
 def  write_to_file(response_data):
     try:
@@ -89,14 +98,19 @@ def  write_to_file(response_data):
     except requests.exceptions.JSONDecodeError:
         print("响应内容不是有效的 JSON 格式")
 
-def request_get(id):
 
+scheme = 'https'
+netloc = 'hub.sdxnetcafe.com'
+path = '/api/admin/work/attendance/list'
+params =''
+fragment = ''
+def request_get(userid):
     query = {
         "startTm":  mon,
         "endTm":    sun,
         "page": 1,
         "limit": 10,
-        "userId": id,
+        "userId": userid,
         "branchId": "a92fd8a33b7811ea87766c92bf5c82be"
     }
 
@@ -104,22 +118,21 @@ def request_get(id):
     url = urlunparse((scheme, netloc, path, params, query_string, fragment))
     response_user  = requests.get(url, headers=iheader.headers)
     return response_user.json()
-    #if response.ok:
-    #    write_to_file(response)
-    #else:
-    #    print(f"请求失败，状态码：{response.status_code}")
 
-def wdrt_sum():
+def work_duration_all():
+    work_duration_json_map = {}
+    work_duration_time_map = {}
 
-    for name, id in get_userid.userids.items():
-        data_json =  request_get(id)
+    for name, id in userid_map.items():
+        work_duration_json_map[name] = request_get(id)
         #此变量有一个用户每天的数据
-        duration_aday = get_total_wduration(data_json)
+        duration_aday = get_total_wduration(work_duration_json_map[name])
+        print(f'调用了{get_total_wduration.call_count}次')
         duration_sum[name] = duration_aday
 
 def get_json_person():
     members_json = {}
-    for name, id in get_userid.userids.items():
+    for name, id in userid_map.items():
         data_json =  request_get(id)
         members_json[name] =  data_json
     return members_json
@@ -159,7 +172,7 @@ def to_xl(worksheet, json):
         else:
             target_cell.value = i['duration']
 
-wdrt_sum()
+work_duration_all()
 
 members_json = get_json_person()
 
@@ -178,7 +191,8 @@ for  num in duration_sum.values():
     sum += num
 
 if __name__ == "__main__":
-    print(duration_sum)
-    print(sum)
-    print('consume_duration', consume_duration.value)
-    print('人效', consume_duration.value/sum)
+    get_value_days = consume_duration.get_value_days
+    consume_duration = get_value_days(weekdays)
+    print("上机时长",consume_duration)
+    print("总工时",sum)
+    print('人效', consume_duration/sum)
